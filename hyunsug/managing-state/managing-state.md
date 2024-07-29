@@ -40,3 +40,30 @@ class:
 초기 상태로 되돌려야 할 때, useEffect를 사용하는 방법보다 간단한 방법으로 사용할 수 있겠습니다.
 
 ---
+
+## useReducer
+
+알고는 있지만 거의 사용하지 않는 리듀서에 대해 간단하게
+
+- `(state, action) => newState`
+- Redux의 영향을 받아 도입되었다
+
+---
+
+### useState와 useReducer
+
+| useState                | useReducer                |
+| ----------------------- | ------------------------- |
+| 간단한 상태             | 복잡한 상태               |
+| 독립적인 상태           | 연관된 상태들             |
+| 적은 양의 상태 업데이트 | 많은 이벤트가 상태를 변경 |
+
+- useReducer의 reducer 함수는 `switch`문을 쓰는 것이 일반적
+- 리듀서 내에서 비동기 로직을 처리하지 말 것
+
+---
+
+## Context
+
+- Context를 생성 -> Provider에 value 주입 -> useContext를 통한 value 사용
+- `use`를 이용한 컨텍스트 사용 방식이 현재 테스트 단계
