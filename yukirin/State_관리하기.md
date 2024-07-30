@@ -15,7 +15,7 @@ state가 어떻게 구성되는지, 컴포넌트 간에 어떻게 state가 흐�
 - `useState`를 사용해서 메모리의 state 표현
 - 불필요한 state 제거
 - state 설정을 위해 이벤트 핸들러 연결
-  > [Coding Styles: Imperative, Declarative and DSL 🤯](https://www.linkedin.com/pulse/coding-styles-imperative-declarative-dsl-sameer-kumar)
+> [Coding Styles: Imperative, Declarative and DSL 🤯](https://www.linkedin.com/pulse/coding-styles-imperative-declarative-dsl-sameer-kumar)
 
 ### 123: state 확인하고, 트리거 추적하고 표현하기
 
@@ -30,7 +30,7 @@ state는 단순할 수록 좋다고 했다. 따라서 중복은 피하고 필수
 - state 변수가 역설을 일으키지는 않는지?
 - 다른 state 변수에 이미 가은 정보가 담겨있지는 않는지?
 - 다른 state 변수를 뒤집었을 때 같은 정보를 얻을 수 있지는 않은지?
-  > [Difference between useState and useReducer - GeeksforGeeks](https://www.geeksforgeeks.org/difference-between-usestate-and-usereducer/)
+> [Difference between useState and useReducer - GeeksforGeeks](https://www.geeksforgeeks.org/difference-between-usestate-and-usereducer/)
 
 ### 5: state 설정을 위해 이벤트 핸들러를 연결하기
 
@@ -159,7 +159,7 @@ state 업데이트가 여러 이벤트 핸들러로 분산되는 경우 state �
 - state를 설정하는 것에서 `action`을 `dispatch` 함수로 전달하는 것으로 바꾸기
 - reducer 함수 작성하기
 - 컴포넌트에서 reducer 사용하기
-  > [When to use useReducer and when not to use it in React](https://medium.com/@queenskisivuli/when-to-use-usereducer-and-when-not-to-use-it-in-react-f8cd5208aee8)
+> [When to use useReducer and when not to use it in React](https://medium.com/@queenskisivuli/when-to-use-usereducer-and-when-not-to-use-it-in-react-f8cd5208aee8)
 
 ### reducer 잘 작성하기
 
@@ -220,6 +220,6 @@ Reducer 상태를 props를 통한 전달 대신 `tasks` state와 `dispatch` 함�
 - Context를 생성한다.
 - State과 dispatch 함수를 context에 넣는다.
 - 트리 안에서 context를 사용한다.
-  > [How to combine useContext with useReducer?](https://www.geeksforgeeks.org/how-to-combine-usecontext-with-usereducer/)
+> [How to combine useContext with useReducer?](https://www.geeksforgeeks.org/how-to-combine-usecontext-with-usereducer/)
 
 이 [예시](https://codesandbox.io/s/jjwhwh?file=/src/TaskList.js&utm_medium=sandpack)와 같이 리팩토링하면 **컴포넌트들이 데이터를 어디서 가져오는지가 아닌 무엇을 보여줄 것인지에 집중**할 수 있도록 깔끔한 정리가 가능해진다.
