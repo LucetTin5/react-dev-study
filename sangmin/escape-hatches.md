@@ -98,8 +98,6 @@ React에서 상태를 업데이트할 때, 직접적으로 객체나 배열을 �
 
 ### [> How can I measure a DOM node?](https://legacy.reactjs.org/docs/hooks-faq.html#how-can-i-measure-a-dom-node)
 
-추가 참조: [useEffect와 useRef의 사용](https://velog.io/@shmoon2917/useEffect-%EC%9D%98%EC%A1%B4%EC%84%B1%EC%97%90-ref%EB%A5%BC-%EB%8B%B4%EC%9D%84-%EB%95%8C%EB%A7%88%EB%8B%A4-%EC%B0%9C%EC%B0%9C%ED%95%98%EC%8B%A0-%EB%B6%84%EB%93%A4%EC%9D%84-%EC%9C%84%ED%95%B4)
-
 DOM 노드의 위치나 크기를 측정하는 기본적인 방법 중 하나는 콜백 ref를 사용하는 것. <br/>
 React는 ref가 다른 노드에 연결될 때마다 해당 콜백을 호출.
 
@@ -128,6 +126,88 @@ useCallback 참조를 사용하면 자식 구성 요소가 나중에 측정된 �
 이 예에서 콜백 참조는 렌더링된 구성 요소가 모든 재렌더링에서 존재하기 때문에 구성 요소가 마운트되고 언마운트될 때만 호출된다. <br/>
 구성 요소의 크기가 조정될 때마다 알림을 받으려면 또는 이를 기반으로 빌드된 타사 Hook을 사용할 수 있다.
 
+measureRef같은 컴포넌트처럼 ref에 대한 callback을 사용해야하는 경우가 뭐가 있을까? <br/>
+[useEffect와 useRef의 사용](https://velog.io/@shmoon2917/useEffect-%EC%9D%98%EC%A1%B4%EC%84%B1%EC%97%90-ref%EB%A5%BC-%EB%8B%B4%EC%9D%84-%EB%95%8C%EB%A7%88%EB%8B%A4-%EC%B0%9C%EC%B0%9C%ED%95%98%EC%8B%A0-%EB%B6%84%EB%93%A4%EC%9D%84-%EC%9C%84%ED%95%B4)
+해당 블로그에서 적절한 예시를 작성해주셨다.
+
+```typescript
+const useGettingHeight = () => {
+  const [height, setHeight] = useState(null);
+  const ref = useRef();
+
+  useEffect(() => {
+    if (!!ref.current) setHeight(ref.current.getBoundingClientRect().height);
+  }, [ref.current]);
+
+  return [height, ref];
+};
+
+const useLoading = () => {
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => setLoading(false), []);
+  return loading;
+};
+
+export default function App() {
+  const [height, ref] = useGettingHeight();
+  const [lazyHeight, lazyRef] = useGettingHeight();
+  const loading = useLoading();
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center"
+      }}
+    >
+      <div ref={ref}>ref height: {height?.toString()}</div>
+      {!loading && (
+        <div ref={lazyRef}>Lazy ref height: {lazyHeight?.toString()}</div>
+      )}
+    </div>
+  );
+}
+```
+ref는 제목처럼 탈출구. <br/>
+근데 useEffect의 의존성 배열에 넣어서 마운트 과정에서 렌더링을 유도하는 과정 자체가 넌센스. <br/>
+(하지만 여기서는 컴포넌트 객체의 스타일에 동적으로(=로딩 과정 이후) 접근하기 위해 해당 형태로 코드를 작성한 것)
+
+```typescript
+const useGettingHeight = () => {
+  const [height, setHeight] = useState(null);
+
+  const ref = useCallback((node: HTMLElement) => {
+    if (node !== null) {
+      setHeight(node.getBoundingClientRect().height);
+    }
+  }, []);
+
+  return [height, ref];
+};
+
+const useLoading = () => {
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => setLoading(false), []);
+  return loading;
+};
+
+export default function App() {
+  const [height, ref] = useGettingHeight();
+  const [lazyHeight, lazyRef] = useGettingHeight();
+  const loading = useLoading();
+
+  return (
+    <>
+      <div ref={ref}>ref height: {height.toString()}</div>
+      {!loading && <div ref={lazyRef}>Lazy ref height: {lazyHeight.toString()}</div>}
+    </>
+  );
+}
+```
+최초 언급한 measuredRef의 사용 양식처럼 useCallback을 사용하는 형태로 코드를 작성하면 의도대로 동작.
 
 <br/>
 <br/>
