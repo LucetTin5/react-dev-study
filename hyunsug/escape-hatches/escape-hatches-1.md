@@ -8,7 +8,7 @@ useRef는 렌더링에 영향을 끼치지 않으면서 정보를 보존하는 �
 import { useRef } from "react";
 
 ...
-const { ref } = useRef();
+const ref = useRef();
 ...
 ```
 
@@ -18,10 +18,13 @@ const { ref } = useRef();
 
 React에서 사용되는 ref의 타입은 크게 `LegacyRef`와 `MutableRefObject`, `RefObject`로 나눌 수 있다.
 
-- MutableRefObject는 `const { ref } = useRef<T>(initialValue: T)`로 선언될 때와 같이, null을 명시하지 않을 경우의 타입이다.
+- MutableRefObject는 `const ref = useRef<T>(initialValue: T)`로 선언될 때와 같이, null을 명시하지 않을 경우의 타입이다.
   - MutableRefObject는 DOM 요소가 아닌 값을 참조하도록 하는 것이 일반적
-- RefObject는 `const { ref } = useRef<T | null>(null)`과 같이, null로 초기화하면서 T | null로 타입을 지정할 때 생성된다.
+  - 반환된 ref는 `{ current: T }`
+- RefObject는 `const ref = useRef<T | null>(null)`과 같이, null로 초기화하면서 T | null로 타입을 지정할 때 생성된다.
 - createRef를 통해 생성된 ref 또한 `RefObject<T>` 타입을 갖는다.
+- 위 두 경우의 `RefObject<T>`는 `{ readonly current: T | null }`
+- readonly이지만 런타임 시점에서는 타입스크립트가 아니라 JS의 실행이기에 React는 이 점을 넘어서 DOM이 렌더링 된 후 current에 DOM 노드를 할당함
 
 - `LegacyRef<T>`는 여러 타입을 포함하는 유니온 타입이다
   - string (deprecated)
