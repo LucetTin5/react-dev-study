@@ -68,3 +68,59 @@ return () => {
 - "ab"를 입력하면 `text`가 "ab"로 업데이트 되므로 리렌더링 후 `useEffect`가 실행
 - `useEffect`는 클린업 함수 실행하고 closure를 통해 "a"에 접근하여 "a" 타이머 취소
 - "ab" 상태의 text를 기억하는 새로운 타이머가 closure를 통해 설정
+
+<br />
+
+## Stale closure 문제
+아래와 같은 두 `useEffect` 문이 있다면 개발자는 콘솔에 1.5초마다 0, 1, 2, 3, ... 차례대로 찍힐 것을 기대한다. ([데모](https://codesandbox.io/s/trap-of-closure-oz4vtf?from-embed))
+```javascript
+useEffect(() => {
+  const timer = setInterval(() => {
+    setCount(count + 1);
+  }, 1500);
+}, []);
+
+useEffect(() => {
+  const timer = setInterval(() => {
+    console.log(count);
+  }, 1500);
+}, []);
+```
+그러나 콘솔을 보면 0만 무한히 찍히는 것을 확인할 수 있다. ![image](https://github.com/user-attachments/assets/c5c2cdbe-7159-42ad-94d6-31127d521674)
+- dependency가 빈배열이므로 최초 한번 실행이 되며, `count`는 최초의 것만을 기억
+- 이것 역시 closure 특성 때문이며, 이러한 문제를 Stale closure 문제라고 지칭함
+### dependency에 상태 추가
+따라서 최신 상태를 얻기 위해서는 리렌더링 할 때마다 `useEffect`를 실행하도록 해야 하고, `count`를 dependency에 추가한다.
+```javascript
+useEffect(() => {
+  const timer = setInterval(() => {
+    setCount(count + 1);
+  }, 1500);
+}, [count]);
+
+useEffect(() => {
+  const timer = setInterval(() => {
+    console.log(count);
+  }, 1500);
+}, [count]);
+```
+![image](https://github.com/user-attachments/assets/e9b2ab9c-36a0-45da-ba28-c6baddcf0b16)
+- count가 증가하면서 콘솔에 찍히기는 하지만 여전히 기대하는 동작은 아님
+- 각각의 Effect가 타임 인터벌을 따로 생성하기 때문에 여러 타이머가 따로 동작하므로
+### 이전 타임 인터벌 정리
+Effect에서 새로운 타이머가 생성될 때 이전 타임 인터벌을 정리하면 원하는 방식으로 동작한다.
+```javascript
+useEffect(() => {
+  const timer = setInterval(() => {
+    setCount(count + 1);
+  }, 1500);
+  return () => clearInterval(timer);
+}, [count]);
+
+useEffect(() => {
+  const timer = setInterval(() => {
+    console.log(count);
+  }, 1500);
+  return () => clearInterval(timer);
+}, [count]);
+```
