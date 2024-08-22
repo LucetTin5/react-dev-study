@@ -99,17 +99,18 @@ export default App;
 
 #### 해결 방식
 
-1. 경쟁 상태 유발가능성 해결
+중에서! '경쟁 상태 유발가능성'만 해결해보도록 하겠습니다.
 
-1.1 경쟁 상태란?
+1. 경쟁 상태란?
 
 [공식 홈페이지 제공 예시](https://maxrozen.com/race-conditions-fetching-data-react-with-useeffect)
 
-비동기 동작의 순서제어가 멋대로 일어나 오래된 데이터가 덮어쓰여지는 문제.
+비동기 동작의 순서제어가 멋대로 일어나 오래된 데이터가 덮어쓰여지는 문제. <br/>
+(이 부분은 codesandbox를 통해 예시 설명을 직접 하려고 했습니다 ㅠ)
 
 <br/>
 
-1.2 TanStack Query의 **'경쟁 상태'** 해결방식
+2. TanStack Query의 **'경쟁 상태'** 해결방식
 
 TanStack Query는 queryKey를 통해 각 쿼리를 고유하게 식별하고, 이를 기반으로 쿼리의 상태를 관리하여 경쟁 상태를 방지한다.
 
@@ -186,7 +187,7 @@ export default UserProfile;
 
 <br/>
 
-1.3. https://github.dev/TanStack/query 실제 코드
+3. https://github.dev/TanStack/query 실제 코드
 
 ```typescript
 // QueryClient.ts
@@ -210,84 +211,57 @@ setQueryData<TQueryFnData = unknown, TTaggedQueryKey extends QueryKey = QueryKey
 ```
 
 <br/>
-
-2. 응답 캐싱
-
-```typescript
-// queryClient.ts
-setQueryData<TQueryFnData = unknown, TTaggedQueryKey extends QueryKey = QueryKey>(queryKey: TTaggedQueryKey, updater: Updater<TInferredQueryFnData | undefined, TInferredQueryFnData | undefined>, options?: SetDataOptions): TInferredQueryFnData | undefined {
-  const defaultedOptions = this.defaultQueryOptions({ queryKey });
-  const query = this.#queryCache.get<TInferredQueryFnData>(defaultedOptions.queryHash);
-  const prevData = query?.state.data;
-  const data = functionalUpdate(updater, prevData);
-  if (data === undefined) {
-    return undefined;
-  }
-  return this.#queryCache.build(this, defaultedOptions).setData(data, { ...options, manual: true });
-}
-```
-```typescript
-// queryClient.ts
-getQueryData<TQueryFnData = unknown, TTaggedQueryKey extends QueryKey = QueryKey>(queryKey: TTaggedQueryKey): TInferredQueryFnData | undefined {
-  const options = this.defaultQueryOptions({ queryKey });
-  return this.#queryCache.get(options.queryHash)?.state.data;
-}
-```
-```typescript
-// queryClient.ts
-invalidateQueries(filters: InvalidateQueryFilters = {}, options: InvalidateOptions = {}): Promise<void> {
-  return notifyManager.batch(() => {
-    this.#queryCache.findAll(filters).forEach((query) => {
-      query.invalidate();
-    });
-    if (filters.refetchType === 'none') {
-      return Promise.resolve();
-    }
-    const refetchFilters: RefetchQueryFilters = {
-      ...filters,
-      type: filters.refetchType ?? filters.type ?? 'active',
-    };
-    return this.refetchQueries(refetchFilters, options);
-  });
-}
-```
-
 <br/>
 
-3. 네트워크 워터폴 해결
+### useEffect와 페인트(paint)의 실행순서는 보장할 수 없다.
+
+화요일에 커리어리에 [useEffect와 관련된 글](https://thoughtspile.github.io/2021/11/15/unintentional-layout-effect/)을 우연찮게 봐서 관련된 내용을 정리합니다.<br/>
+블로그 글을 그대로 적는 것은 의미가 없으니, 읽지 않으신 분들도 초스피드로 이해할 수 있도록 작성하겠습니다.
+
+일반적인 흐름에서 리액트의 업데이트는 순서는 다음과 같습니다.
+1. 리액트 작업: 컴포넌트 렌더링 및 조정(Reconciliation) 작업을 통해 새로운 UI를 계산, <br/>
+이펙트를 스케줄링한 후 실제 DOM 업데이트를 준비.
+2. layoutEffect 호출
+3. 브라우저 페인트: 리액트가 제어를 브라우저에 넘기고, 브라우저가 새롭게 변경된 DOM을 화면에 렌더링(paint).
+4. effect 호출: useEffect가 호출되어 비동기 작업이나 DOM과 상관없는 작업을 처리.
+
+<img src="images/effectorder.png" width="80%"/>
+
+useEffect가 paint(화면에 렌더링) 이전에 실행될 수 있다는 점이 문제가 될 수 있는 상황이 존재합니다.
 
 ```typescript
-// queryClient.ts
-refetchQueries(filters: RefetchQueryFilters = {}, options?: RefetchOptions): Promise<void> {
-  const fetchOptions = {
-    ...options,
-    cancelRefetch: options?.cancelRefetch ?? true,
-  };
-  const promises = notifyManager.batch(() =>
-    this.#queryCache.findAll(filters).filter((query) => !query.isDisabled()).map((query) => {
-      let promise = query.fetch(undefined, fetchOptions);
-      if (!fetchOptions.throwOnError) {
-        promise = promise.catch(noop);
-      }
-      return query.state.fetchStatus === 'paused' ? Promise.resolve() : promise;
-    }),
-  );
-  return Promise.all(promises).then(noop);
-}
-```
-```typescript
-// queryClient.ts
-cancelQueries(filters: QueryFilters = {}, cancelOptions: CancelOptions = {}): Promise<void> {
-  const defaultedCancelOptions = { revert: true, ...cancelOptions };
+import React, { useEffect, useState } from 'react';
 
-  const promises = notifyManager.batch(() =>
-    this.#queryCache.findAll(filters).map((query) => query.cancel(defaultedCancelOptions)),
-  );
+function Example() {
+  const [boxHeight, setBoxHeight] = useState(0);
 
-  return Promise.all(promises).then(noop).catch(noop);
+  useEffect(() => {
+    const boxElement = document.getElementById('box');
+    const height = boxElement.getBoundingClientRect().height;
+    setBoxHeight(height);
+
+    // 여기서 height를 기준으로 다른 요소의 스타일을 업데이트할 수 있습니다.
+    document.getElementById('another-element').style.marginTop = `${height}px`;
+  }, []);
+
+  return (
+    <div>
+      <div id="box" style={{ height: '100px', backgroundColor: 'lightblue' }}>
+        Box
+      </div>
+      <div id="another-element" style={{ backgroundColor: 'lightcoral' }}>
+        Another Element
+      </div>
+    </div>
+  );
 }
+
+export default Example;
 ```
 
-<br/>
+ #another-element의 스타일 변경에 따라 브라우저가 이 정보를 반영하기 위해 추가적인 레이아웃 계산을 수행해야 하며, <br/> 이로 인해 화면이 깜빡이거나 레이아웃이 변경되는 동안 사용자가 불안정한 UI를 보게 될 수 있습니다.
 
----
+요컨데 css따위 같은 그려진 DOM에 대한 값을 조작하는 로직이 effect 내부에 들어가 있을 때 문제가 생길 수 있다는 말입니다.
+
+따라서 위와같은 로직은 useLayoutEffect에 작성하여 paint 이전으로의 순서를 보장받아야 정상적으로 동작할 수 있습니다.
+
