@@ -4,6 +4,7 @@
 
 • 정의: `React 19 RC`, `React Canary`에서 사용 가능한 새로운 Hook
 • 목적: `Server Action`과 `Server Component` 맥락에서 클라이언트 측 상태 관리
+• `Server Action`, `Server Components`는 `React 19 RC`, `React Canary`에서 사용 가능
 
 ### 주요 기능
 
@@ -272,3 +273,36 @@ useEffect(() => {
 • 의존성 배열 생략 시 매 렌더링마다 실행
 • 정리 함수로 구독 해제 등 수행 가능
 • 브라우저 화면 그린 후 비동기적 실행
+
+## Dependency Array
+
+• `useEffect`, `useCallback` 등의 훅은 `dependency array`를 가지고 있으며, array 변화를 추적한다.
+• 이 때 react의 dependency array 변화는 react의 패키지 중 `shared`에 포함된 아래를 통해 진행
+• 기본적으로 `Object.is`를 사용하기에 얕은 비교임을 알 수 있음
+
+```js
+/**
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ *
+ * @flow
+ */
+
+/**
+ * inlined Object.is polyfill to avoid requiring consumers ship their own
+ * https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/is
+ */
+function is(x: any, y: any) {
+  return (
+    (x === y && (x !== 0 || 1 / x === 1 / y)) || (x !== x && y !== y) // eslint-disable-line no-self-compare
+  );
+}
+
+const objectIs: (x: any, y: any) => boolean =
+  // $FlowFixMe[method-unbinding]
+  typeof Object.is === 'function' ? Object.is : is;
+
+export default objectIs;
+```
