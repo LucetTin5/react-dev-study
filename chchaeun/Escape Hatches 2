@@ -1,0 +1,231 @@
+useEffectEvent()의 동작원리를 파악하고자 [How does useEffectEvent() work internally in React?](https://jser.dev/react/2023/03/18/useeffectevent/)를 읽고 내용을 번역해보았습니다.
+
+## 1. Effect 이벤트에 대하여
+
+공식문서로부터, Effect 이벤트는 Effect 로직의 일부지만, 이벤트 핸들러에 가깝게 동작하며, **reactive**하지 않다.
+리액트 문서에서 reactive라는 단어를 본 게 처음인데, [First look at fine-grained reactivity in Solid](https://jser.dev/react/2023/02/26/reactivity-in-solidjs)에 대해 작성한 후 더욱 잘 이해하게 되었다.
+
+간단히 말하면, `useEffectEvent()`가 해결하려 하는 문제는 훅의 경고(caveat)이다.
+1. `useEffect()`가 달성하려는 것 때문에, 콜백이 최신값을 사용할 수 있도록 불안정한(non-stable) 값을 의존성 배열에 넣어야 된다.
+2. 하지만 의존성 배열의 아이템들은 reactive하고, 그들의 의미 변화가 Effect 콜백을 유발할 수 있다. (useEffect()의 동작 방식으로부터, 참조: [The lifecycle effect hooks in React](https://jser.dev/react/2022/01/19/lifecycle-of-effect-hook))
+
+의존석 배열은 이러한 두 가지 효과를 가지고, 그것들을 분리할 수 없다. [공식문서](https://react.dev/learn/separating-events-from-effects#declaring-an-effect-event)에 이러한 딜레마를 이해하기 좋은 예제가 있다. 
+
+이것을 해결하는 하나의 방법은, reactivity를 Effect 콜백 안에서 멈추는 것이다. 다음과 같이.
+
+```js
+useEffect(() => {
+  if (some condition is true){
+    return // do no run
+  }
+}, [a, b, c])
+```
+
+하지만 이것은 엉망이 되기 쉽고, 또다른 방법은 값을 안정화함으로써 reactivity를 멈추는 것이다.
+```
+const refC = useRef(c)
+
+useEffect(() => {
+  const c = refC.current
+  ...
+}, [a, b])
+
+`useEffectEvent()`는 두 번째 접근에 가깝다고 생각하지만, 구현에 있어 차이점이 있다. 특히 그것을 어떻게 업데이트하느냐에 있어서. 같이 파헤쳐보자.
+
+## 2. useEffectEvent가 내부적으로 어떻게 동작하나?
+
+[useRef가 내부적으로 어떻게 동작하느냐](https://jser.dev/react/2021/12/05/how-does-useRef-work)를 설명하는 방식처럼, 훅은 두 가지 내부 구현을 가진다. 하나는 초기 렌더(mount)를 위한 것이고, 하나는 업데이트를 위한 것이다.
+2.1 mountEvent()
+```js
+function mountEvent<Args, Return, F: (...Array<Args> => Return>(
+  callback: F
+): F {
+  const hook = mountWorkInProgressHook();
+  const ref = { impl: callback };
+  hook.memoizedState = ref;
+
+  return function eventFn(){
+    if (isInvalidExecutionContextForEventFunction()){
+      throw new Error(
+        "A function wrapped in useEffectEvent can't be called during rendering."
+      );
+    }
+    return ref.impl.apply(undefined, arguments);
+  };
+}
+```
+`mountEvent()`는 꽤 단순하다.
+  1. mountWorkInProgressHook()으로 새로운 훅을 생성한다.
+  2. 훅의 상태는 콜백함수를 가진 ref 객체이다.
+  3. 함수는 this를 제외한 콜백을 실행하는 클로저를 리턴한다. 대부분은 콜백 그 자체를 리턴하는 것과 같다.
+
+2.2 updateEvent
+이는 우리가 그것을 직접 구현하려면 `useLayoutEffect()`가 필요하다고 언급한 이유와 관련있다.
+예를 들어,
+```js
+const event = useEvent(props.callback);
+```
+만약 props로부터 온 callback이 바뀐다면, 우리는 ref 객체 안에 있는 내부 콜백을 업데이트해야 한다.
+```js
+function updateEvent<Args, Return F: (...Array<Args>) => Return>(
+  callback: F
+): F {
+  const hook = updateWorkInProgressHook();
+  const ref = hook.memoizedState;
+
+  useEffectEventImpl({ ref, nextImpl: callback });
+
+  return function eventFn(){
+    if (isInvalidExecutionContextForEventFunction()){
+      throw new Error(
+        "A function wrapped in useEffectEvent can't be called during rendering."
+      );
+    }
+    return ref.impl.apply(undefined, arguments);
+  );
+}
+```
+리턴 값은 이전과 같고, 그러므로 업데이트는 사실 `useEffectEventImpl()`에서 발생한다.
+
+```js
+function useEffectEventImpl<Args, Return, F: (...Array<Args>) => Return>(
+  payload: EventFunctionPayload<Args, Return, F>
+){
+  currentlyRenderingFiber.flags |= UpdateEffect;
+  let componentUpdateQueue: null | FunctionComponentUpdateQueue = (currentlyRenderingFiber.updateQueue: any);
+  if (componentUpdateQueue === null){
+    componentUpdateQueue = createFunctionComponentUpdateQueue();
+    currentlyRenderingFiber.updateQueue = (componentUpdateQueue: any);
+    componentUpdateQueue.events = [payload];
+  } else{
+    const events = componentUpdateQueue.events;
+    if (events === null){
+      componentUpdateQueue.events = [payload];
+    } else{
+      event.push(payload);
+    }
+  }
+}
+
+```
+
+이 코드는 복잡해보이지만 사실 그렇지 않다. 이것은 단하나의 일을 하는데, update task를 updateQueue.events에 푸시하는 것이다. 큐는 현재 rendering fiber node에 있다.
+
+왜 이런 일을 하는 걸까? 왜냐하면 여러 개의 useEffectEvent 콜이 생겼을 때, 여러 개의 콜백 업데이트가 생길 것이기 때문이다. fiber의 이벤트 배열을 사용함으로써, 업데이트를 배치로 실행할 수 있다.
+
+왜 콜백을 배치 업데이트하길 원할까? 확신할 수는 없지만, 콜백이 렌더링에 사용된다면, 일관되지 않은 결과를 야기할 수도 있기 때문이다. concurrent 모드에서는 렌더링이 방해될 수 있기 때문에. 하지만 effect 이벤트를 위해, isInvalidExecutionContextForEventFunction이 이미 렌더링에 사용되지 않도록 보호하고 있긴 하다.
+그들이 예상치 못한 이슈를 피하기 위해서 업데이트가 커밋 단계에 있는지 확신하고 싶은 거라고 추측하고 있다. 왜인지 알면 알려달라.
+
+## 2.3 updates happend in commiting
+```js
+function commitUseEffectEventMount(finishedWork: Fiber){
+  const updateQueue: FunctionComponentUpdateQueue | null = (finishedWork.updateQueue: any);
+  const eventPayloads = updateQueue !== null ? updateQueue.events : null;
+
+  if (eventPayloads !== null){
+    for (let ii = 0; ii < eventPayloads.length; ii++){
+      const { ref, nextImpl } = eventPayloads[ii];
+      ref.impl = nextImpl;
+    }
+  }
+}
+```
+
+여기서 배열이 사용된다. 딱히 멋질 것도 없고, 그냥 ref 객체를 새로운 callback과 함께 업데이트한다.
+그리고 이 함수는 `commitBeforeMutationEffectsOnFiber()`에서 호출된다.
+
+```js
+function commitBeforeMutationEffectsOnFiber(finishedWork: Fiber){
+  const current = finishedWork.alternate;
+  const flags = finishedWork.flags;
+
+  ...
+
+  swtich(finishedWork.tag){
+    case FunctionComponent: {
+      if (enableUseEffectEventHook){
+        if ((flags & Update) !== NoFlags){
+          commitUseEffectEventMount(finishedWork);
+        }
+      }
+      break;
+    }
+    ...
+  }
+}
+```
+
+파헤쳐보면, 이것은 commitRoot로부터, commitBeforeMutationEffects에서 실행된다. 우리는 이것을 전에 useLayoutEffect에서 봤다.
+
+## 2.4 it is NOT stable
+updateEvent로부터, 그것이 모든 렌더로부터 새로운 클로저를 반환하는 것을 볼 수 있다. 그래서 이것은 stable하지 않고, 테스트케이스에서도 다뤄진다.
+```js
+it("doesn't provide a stable identity", async () => {
+  function Counter({ shouldRender, value }) {
+    const onClick = useEffectEvent(() => {
+      Scheduler.log(
+        "onClick, shouldRender=" + shouldRender + ", value=" + value
+      );
+    });
+    // onClick doesn't have a stable function identity so this effect will fire on every render.
+    // In a real app useEffectEvent functions should *not* be passed as a dependency, this is for
+    // testing purposes only.
+    useEffect(() => {
+      onClick();
+    }, [onClick]);
+    useEffect(() => {
+      onClick();
+    }, [shouldRender]);
+    return <></>;
+  }
+  ReactNoop.render(<Counter shouldRender={true} value={0} />);
+  await waitForAll([
+    "onClick, shouldRender=true, value=0",
+    "onClick, shouldRender=true, value=0",
+  ]);
+  ReactNoop.render(<Counter shouldRender={true} value={1} />);
+  await waitForAll(["onClick, shouldRender=true, value=1"]);
+  ReactNoop.render(<Counter shouldRender={false} value={2} />);
+  await waitForAll([
+    "onClick, shouldRender=false, value=2",
+    "onClick, shouldRender=false, value=2",
+  ]);
+});
+```
+이유는 모르겠지만, 원본 RFC 때문에 그것이 안정적이어야 한다.
+이것의 구현이 이벤트가 항상 최신의 값을 리턴하는 것을 확신하므로, 그것이 오직 useEffect 안에서 사용되는 것이 요구되면 안정적일 필요는 없다.
+
+
+다음은 useEffectEvent를 직접 구현한 분이 [쓴 글](https://velog.io/@wusi-hub/useEffectEvent-%EB%A7%8C%EB%93%A4%EC%96%B4-%EB%B3%B4%EC%95%98%EC%8A%B5%EB%8B%88%EB%8B%A4#useeffectevent)에서 발췌한 코드입니다.
+
+```js
+import { useEffect, useRef } from 'react';
+
+function useEffectEvent(callback) {
+  // 1. useRef를 사용하여 초기 콜백 함수를 저장할 callbackRef를 생성합니다.
+  const callbackRef = useRef(callback);
+
+  // 2. useEffect를 사용하여 콜백 함수가 변경될 때마다 callbackRef를 업데이트합니다.
+  useEffect(() => {
+    callbackRef.current = callback;
+  }, [callback]);
+
+  // 3. 최종적으로 반환되는 함수는 콜백 함수를 호출하는 함수입니다.
+  //    이 함수는 어떤 인자든 받을 수 있도록 (...args) => { ... } 형태로 정의되어 있습니다.
+  return (...args) => {
+    // 4. 현재 저장된 콜백 함수를 가져와서 타입을 확인합니다.
+    if (typeof callbackRef.current === 'function') {
+      // 5. 콜백 함수가 함수 타입인 경우 해당 함수를 호출하고,
+      //    함수에 (...args)를 통해 전달된 인자들을 전달합니다.
+      callbackRef.current(...args);
+    } else {
+      // 6. 콜백 함수가 함수 타입이 아닌 경우 콘솔에 오류 메시지를 출력합니다.
+      console.error('Callback이 함수 타입이 아닙니다.');
+    }
+  };
+}
+```
+
+ref를 이용하여 콜백함수를 저장하고, 변경 시마다 업데이트하며, 최종 반환된 함수가 호출된 경우 ref에서 값을 가져와서 실행시킵니다.
+실제 동작과 다른 점은 배치 작업이 없다는 점이고 기본 개념은 동일하여, 좀 더 간단하게 이해하기 좋아서 가져왔습니다.
+
