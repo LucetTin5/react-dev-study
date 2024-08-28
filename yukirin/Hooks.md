@@ -120,3 +120,133 @@ useEffect(() => {
 - `dependencies`: `setup` 함수 내부에서 참조되는 모든 반응형 값들이 포함된 배열로 구성된다. 
 ### 반환값
 - `undefined`: `useEffect`는 `undefined`를 반환한다.
+
+<br/>
+
+# [useId](https://ko.react.dev/reference/react/useId)
+접근성 어트리뷰트에 전달할 수 있는 고유 ID를 생성한다.
+```javascript
+const id = useId();
+/*
+const passwordHintId = useId();
+return (
+  <>
+    <input type="password" aria-describedby={passwordHintId} />
+    <p id={passwordHintId}>
+  </>
+)
+*/
+```
+### 매개변수
+- 어떠한 매개변수도 받지 않는다.
+### 반환값
+- `id`: `useId`를 호출한 특정 컴포넌트와 특정 `useId`에 관련된 고유 ID 문자열을 반환한다.
+### 유용한 경우
+- `aria-describedby`와 같은 HTML 접근성 어트리뷰트를 사용하면 두 태그가 연관되어 있음을 명시할 수 있다.
+- 서버 렌더링과 클라이언트 hydration 과정에서 일관되고 고유한 ID를 생성하고 싶은 경우.
+
+<br/>
+
+# [useImperativeHandle](https://ko.react.dev/reference/react/useImperativeHandle)
+[ref](https://ko.react.dev/learn/manipulating-the-dom-with-refs)로 노출되는 핸들을 사용자가 직접 정의할 수 있게 해준다.
+```javascript
+useImperativeHandle(ref, createHandle, dependencies?);
+/*
+const MyInput = forwardRef(function MyInput(props, ref) {
+  const inputRef = useRef(null);
+
+  useImperativeHandle(ref, () => {
+    return {
+      focus() { inputRef.current.focus(); },
+      scrollIntoView() { inputRef.current.scrollIntoView(); },
+    };
+  }, []);
+
+  return <input {...props} ref={inputRef} />;
+});
+*/
+```
+### 매개변수
+- `ref`: `forwardRef` 렌더링 함수에서 두 번째 인자로 받은 ref이다. (부모가 전달한 ref)
+- `createHandle`: 인자가 없고 노출하려는 ref 핸들을 반환하는 함수.
+  - 해당 ref 핸들은 어떠한 유형이든 될 수 있으며 일반적으로 노출하려는 메서드가 있는 객체를 반환.
+- `dependencies`: `createHandle` 코드 내에서 참조하는 모든 반응형 값을 나열한 목록.
+### 반환값
+- `undefined`: `useEffect`는 `useImperativeHandle`를 반환한다.
+### 유용한 경우
+- 부모 컴포넌트에게 자식 DOM 노드의 전체 액세스 권한이 아닌 특정 메서드만 호출할 수 있도록 한다.
+- 다양한 타입의 자식 element ref에 접근하여 액션을 지정하고 싶은 경우.
+
+<br/>
+
+# [useInsertionEffect](https://ko.react.dev/reference/react/useInsertionEffect)
+layout Effects 가 실행되기 전에 전체 요소를 DOM에 주입한다.
+```javascript
+useInsertionEffect(setup, dependencies?);
+/*
+function useCSS(rule) { // CSS-in-JS 라이브러리 안에서
+  useInsertionEffect(() => {
+    // ... <style> 태그를 여기에서 주입하세요 ...
+  });
+  return rule;
+}
+*/
+```
+### 매개변수
+- `setup`: Effect 로직이 포함된 함수. 컴포넌트가 DOM에 추가되기 전에, layout Effects 가 실행되기 전에, React는 `setup` 실행.
+- `dependencies`: `setup` 코드 내에서 참조하는 모든 반응형 값을 나열한 목록.
+### 반환값
+- `undefined`: `useInsertionEffect`는 `undefined`를 반환한다.
+### 유용한 경우
+- 성능이 저하되지 않는 선에서 런타임에 `<style />` 태그를 주입하고 싶은 경우.
+
+<br/>
+
+# [useLayoutEffect](https://ko.react.dev/reference/react/useLayoutEffect)
+브라우저가 화면을 다시 그리기 전에 실행되는 `useEffect`이다.
+```javascript
+useLayoutEffect(setup, dependencies?);
+/*
+const ref = useRef(null);
+const [tooltipHeight, setTooltipHeight] = useState(0);
+
+useLayoutEffect(() => {
+  const { height } = ref.current.getBoundingClientRect();
+  setTooltipHeight(height);
+}, []);
+*/
+```
+### 매개변수
+- `setup`: Effect 로직이 포함된 함수. 컴포넌트가 DOM에 추가되기 전에, React는 `setup` 실행.
+- `dependencies`: `setup` 코드 내에서 참조하는 모든 반응형 값을 나열한 목록.
+### 반환값
+- `undefined`: `useLayoutEffect`는 `undefined`를 반환한다.
+### 유용한 경우
+- 컴포넌트의 화면상 위치와 크기인 레이아웃 정보를 사용해서 컴포넌트를 렌더링하고자 하는 경우.
+
+<br/>
+
+# [useMemo](https://ko.react.dev/reference/react/useMemo)
+리렌더링 사이에 계산 결과를 캐싱할 수 있게 해준다.
+```javascript
+const cachedValue = useMemo(calculateValue, dependencies);
+/*
+function TodoList({ todos, tab }) {
+  const visibleTodos = useMemo(
+    () => filterTodos(todos, tab),
+    [todos, tab]
+  );
+  // ...
+}
+*/
+```
+### 매개변수
+- `calculateValue`: 캐싱하려는 값을 계산하는 함수. 순수해야 하며 인자를 받지 않고, 모든 타입의 값을 반환할 수 있어야 함..
+  - 렌더링할 때, `dependencies` 변경되면, `calculateValue` 호출되어 새로운 값을 계산. 그렇지 않으면, 이전 저장 값 반환.
+- `dependencies`: `calculateValue` 코드 내에서 참조하는 모든 반응형 값을 나열한 목록.
+### 반환값
+- `cachedValue`: 캐싱된 `calculateValue`를 호출한 결과를 반환.
+### 유용한 경우
+- 비용이 높은 로직이 재계산되는 것을 생략하여 성능 향상 하고 싶은 경우.
+- `memo`로 감싸진 컴포넌트에 prop로 전달할 경우 값이 변경되지 않으면 렌더링 생략하고 싶을 때.
+- 또 다른 Hook의 종속성으로 사용할 경우, 객체 자체를 메모제이션 하고 싶은 경우.
