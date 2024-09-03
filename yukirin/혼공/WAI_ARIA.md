@@ -44,7 +44,7 @@ Role은 `role`을 사용하여 이름 그대로 HTML element의 역할을 정의
 <div role="button" tabindex="0" onclick="alert('버튼이 클릭되었습니다.')">클릭하세요</div>
 ```
 - 위 예시처럼 HTML 요소의 의미와 역할을 보존하고, HTML 표준과의 호환성을 유지하도록 해야 한다.
-- - 오남용하면 안된다. HTML element 자체로 충분히 의미를 전달할 수 있다면 `role`을 사용하지 않는다.
+- 오남용하면 안된다. HTML element 자체로 충분히 의미를 전달할 수 있다면 `role`을 사용하지 않는다.
 ### 태그별 내장된 암묵적인 role
 HTML의 각 태그별로 암묵적으로 의미하는(갖고 있는) role이 있다. 
 ```html
@@ -57,7 +57,7 @@ HTML의 각 태그별로 암묵적으로 의미하는(갖고 있는) role이 있
 <br/>
 
 # State and Property
-Property는 해당 element의 특징이나 상황을 정의하며 `aria-` 접두사를 사용하며, State는 현재 상태를 나타낸다.
+Property는 해당 element의 특징이나 상황을 정의하며 `aria-*` 접두사를 사용하며, State는 현재 상태를 나타낸다.
 ```html
 <!-- property state example 1 -->
 <li role="checkbox" aria-checked="true">체크박스 아이템</li>
